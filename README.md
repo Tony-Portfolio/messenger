@@ -2,18 +2,18 @@
 
 A new Flutter project created with FlutLab - https://flutlab.io
 
-## Getting Started
+## Application Preview
 
-A few resources to get you started if this is your first Flutter project:
+## Desktop
 
-- https://flutter.dev/docs/get-started/codelab
-- https://flutter.dev/docs/cookbook
+![Alt text](Desktop.JPG)
 
-For help getting started with Flutter, view our
-https://flutter.dev/docs, which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Tablet
 
-## Getting Started: FlutLab - Flutter Online IDE
+![Alt text](Tablet.JPG)
 
-- How to use FlutLab? Please, view our https://flutlab.io/docs
-- Join the discussion and conversation on https://flutlab.io/residents
+## Mobile
+
+![Alt text](Contact-mobile.JPG)
+
+![Alt text](Chat-mobile.JPG)
