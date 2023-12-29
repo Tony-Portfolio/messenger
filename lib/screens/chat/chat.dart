@@ -2,14 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:chat_bubbles/chat_bubbles.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:messenger/screens/contact/contact.dart';
 import '../../supabase/supabase.dart';
+import 'package:intl/intl.dart';
+import '../profile/profile.dart';
+import 'package:provider/provider.dart';
+import '../../providers/chat_provider.dart';
+import 'chat_thumbnail.dart';
 
 class ChatScreen extends StatefulWidget {
-  final conversation_id;
-  final recipients_id;
-  const ChatScreen(
-      {Key? key, required this.conversation_id, required this.recipients_id})
-      : super(key: key);
+  const ChatScreen({Key? key}) : super(key: key);
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -18,191 +20,269 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final userId = supabase.auth.currentUser!.id;
   late Stream<List<dynamic>> messages;
-  late final conversationId;
+  final ScrollController _scrollController = ScrollController();
 
-  Future<void> _getRecipientsData(userId) async {
-    try {
-      final recipientsData =
-          await supabase.from('users').select('*').eq('user_id', userId);
-      print(recipientsData);
-    } catch (e) {
-      print('Error : $e');
-    }
+  Future<void> _getInitialMessageStream() async {
+    final conversationId = context.read<ChatProvider>().conversationId;
+    final recipientsData = context.read<ChatProvider>().recipientsData;
+    print('Chat: initial $conversationId $recipientsData');
+    print('Data Initial ${context.read<ChatProvider>().conversationId}');
+
+    final stream = supabase
+        .from('messages')
+        .stream(primaryKey: ['id'])
+        .eq('conversation_id', conversationId)
+        .order('created_at', ascending: true);
+
+    setState(() {
+      messages = stream;
+    });
   }
 
-  // Future<void> _getInitialMessageStream() async {
-  //   print('Chat: initial');
-  //   final response = await supabase
-  //       .from('conversation')
-  //       .select("*, messages(*)")
-  //       .eq('user_id', userId)
-  //       .order('created_at', ascending: true)
-  //       .limit(1);
-
-  //   conversationId = response?[0]['conversation_id'];
-  //   print('Conversation Id : $conversationId and Response : $response');
-
-  //   final stream = supabase
-  //       .from('messages')
-  //       .stream(primaryKey: ['id'])
-  //       .eq('conversation_id', conversationId)
-  //       .order('created_at', ascending: true);
-
-  //   setState(() {
-  //     messages = stream;
-  //   });
-  // }
+  String formatCreatedAt(String createdAt) {
+    DateTime dateTime = DateTime.parse(createdAt);
+    String formattedTime = '';
+    formattedTime += DateFormat('h').format(dateTime);
+    formattedTime += ':';
+    formattedTime += DateFormat('mm').format(dateTime);
+    formattedTime += (" " + DateFormat('a').format(dateTime));
+    return formattedTime;
+  }
 
   @override
   void initState() {
     super.initState();
     messages = const Stream.empty();
-
-    _getRecipientsData(widget.recipients_id);
-    // _getInitialMessageStream();
+    print('Data wk ${context.read<ChatProvider>().conversationId}');
+    print('Data wk ${context.read<ChatProvider>().recipientsData}');
+    _getInitialMessageStream();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          Container(
-            color: Colors.grey.shade100,
-            child: FutureBuilder(
-              future: _getRecipientsData(widget.recipients_id),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return CircularProgressIndicator();
-                } else if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}');
-                } else {
-                  final recipientsProfile =
-                      snapshot.data as List<Map<String, dynamic>>;
-                  return Expanded(
-                    child: ListView.builder(
-                      itemCount: recipientsProfile.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final item = recipientsProfile[index];
-                        return Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              child: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Colors.transparent,
-                                // Assuming 'profile_picture' is a key in your item map
-                                backgroundImage: Image.asset(
-                                  'https://midlsoyjkxifqakotayb.supabase.co/storage/v1/object/public/data/profile/${item['profile_picture']}',
-                                  width: 22,
-                                  height: 22,
+    return Consumer<ChatProvider>(
+      builder: (context, chatProvider, child) {
+        _getInitialMessageStream(); // Call the function here
+        final profile = context.watch<ChatProvider>().recipientsData;
+        final chatProvider = context.watch<ChatProvider>().conversationId;
+        final conversationId = context.read<ChatProvider>().conversationId;
+        final recipientsData = context.read<ChatProvider>().recipientsData;
+        print("RUNNING EVERYTIME ? ");
+        if (chatProvider != 0) {
+          return Scaffold(
+            body: Column(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  color: Colors.grey.shade100,
+                  child: Container(
+                    child: Row(
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            if (MediaQuery.of(context).size.width < 600) {
+                              Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation,
+                                          secondaryAnimation) =>
+                                      const ContactScreen(),
+                                  transitionsBuilder: (context, animation,
+                                      secondaryAnimation, child) {
+                                    const begin = Offset(-1.0, 0.0);
+                                    const end = Offset.zero;
+                                    const curve = Curves.easeInOutQuart;
+                                    var tween = Tween(begin: begin, end: end)
+                                        .chain(CurveTween(curve: curve));
+                                    var offsetAnimation =
+                                        animation.drive(tween);
+
+                                    return SlideTransition(
+                                      position: offsetAnimation,
+                                      child: child,
+                                    );
+                                  },
+                                ),
+                              );
+                            } else {
+                              context.read<ChatProvider>().changeChat(
+                                  newConversationId: 0, newRecipientsData: []);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: SvgPicture.asset(
+                                'assets/chevron-left-solid.svg',
+                                width: 30,
+                                height: 20),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ProfileScreen()));
+                            },
+                            child: ClipOval(
+                              child: Hero(
+                                tag: 'img',
+                                child: Image.network(
+                                  'https://midlsoyjkxifqakotayb.supabase.co/storage/v1/object/public/data/profile/${profile['profile_picture']}',
+                                  width: 40,
+                                  height: 40,
                                   fit: BoxFit.cover,
-                                ).image,
-                              ),
-                            ),
-                            Container(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item['username'] ?? 'Unknown',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15)),
-                                  Text('Online',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/phone-solid.svg',
-                                      width: 20,
-                                      height: 20,
-                                    ),
-                                    SizedBox(width: 12),
-                                    SvgPicture.asset(
-                                      'assets/option-dots-solid.svg',
-                                      width: 20,
-                                      height: 20,
-                                    ),
-                                  ],
                                 ),
                               ),
                             ),
-                          ],
-                        );
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(profile['username'] ?? 'Unknown',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
+                              Text('Online',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/phone-solid.svg',
+                                  width: 20,
+                                  height: 20,
+                                ),
+                                SizedBox(width: 12),
+                                SvgPicture.asset(
+                                  'assets/option-dots-solid.svg',
+                                  width: 20,
+                                  height: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: StreamBuilder(
+                      stream: messages,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else {
+                          print(snapshot.data);
+                          // return Text('ho');
+                          return ListView.builder(
+                            controller: _scrollController,
+                            itemCount: snapshot.data?.length ?? 0,
+                            itemBuilder: (context, index) {
+                              final message = snapshot.data![index];
+                              print(message['content']);
+                              return Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      message['sender_id'] == userId
+                                          ? CrossAxisAlignment.end
+                                          : CrossAxisAlignment.start,
+                                  children: [
+                                    BubbleSpecialOne(
+                                      text: message['content'],
+                                      isSender: message['sender_id'] == userId,
+                                      color: Colors.blue,
+                                      textStyle: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    // Container(
+                                    //   padding:
+                                    //       const EdgeInsets.symmetric(horizontal: 16),
+                                    //   child: Text(
+                                    //     formatCreatedAt(message['created_at']),
+                                    //     style: TextStyle(
+                                    //         fontSize: 10,
+                                    //         fontWeight: FontWeight.w600),
+                                    //   ),
+                                    // ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        }
                       },
                     ),
-                  );
-                }
-              },
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder(
-              stream: messages,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                } else {
-                  print(snapshot.data);
-                  // return Text('ho');
-                  return ListView.builder(
-                    itemCount: snapshot.data?.length,
-                    itemBuilder: (context, index) {
-                      final message = snapshot.data![index];
-                      print(message['content']);
-                      return Container(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: BubbleSpecialOne(
-                            text: message['content'],
-                            isSender: message['sender_id'] == userId,
-                            color: Colors.blue,
-                            textStyle: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white,
-                            ),
-                          ));
-                    },
-                  );
-                }
-              },
-            ),
-          ),
-          Container(
-            child: Row(
-              children: [
-                Expanded(
-                  child: StyledTextField(),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  color: Colors.grey.shade100,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: StyledTextField(
+                            conversation_id: conversationId.toString(),
+                            recipients_data: profile),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
+          );
+        } else {
+          return ChatThumbnailScreen();
+        }
+      },
     );
   }
 }
 
 class StyledTextField extends StatelessWidget {
   final _textController = TextEditingController();
+  final conversation_id;
+  final recipients_data;
   var userId = supabase.auth.currentUser!.id;
 
+  StyledTextField(
+      {required this.conversation_id, required this.recipients_data});
+
   void insertChat() async {
-    await supabase.from('messages').insert({
-      'sender_id': userId,
-      'recipient_id': userId,
-      'content': _textController.text.trim(),
-      'conversation_id': 1,
-    });
+    try {
+      final response = await supabase.from('messages').insert({
+        'sender_id': userId,
+        // 'recipient_id': recipients_data['user_id'],
+        'content': _textController.text.trim(),
+        'conversation_id': conversation_id,
+      });
+    } catch (e) {
+      print('Error : $e');
+    }
     _textController.text = "";
   }
 
@@ -216,7 +296,7 @@ class StyledTextField extends StatelessWidget {
           Expanded(
             child: TextFormField(
               controller: _textController,
-              style: TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
                 hintText: 'Type your message...',
                 hintStyle: TextStyle(color: Colors.grey),
@@ -229,7 +309,8 @@ class StyledTextField extends StatelessWidget {
                   borderSide: BorderSide(color: Colors.blue),
                 ),
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                isDense: false,
               ),
               maxLines: 4,
               minLines: 1,

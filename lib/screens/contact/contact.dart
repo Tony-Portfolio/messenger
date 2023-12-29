@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../supabase/supabase.dart';
 import '../chat/chat.dart';
+import '../profile/profile.dart';
+import 'package:provider/provider.dart';
+import '../../providers/chat_provider.dart';
 
 class ContactScreen extends StatefulWidget {
   const ContactScreen({Key? key}) : super(key: key);
@@ -35,6 +38,7 @@ class _ContactScreenState extends State<ContactScreen> {
       // append conversation id
       Map<String, dynamic> additionalData = {
         'conversation_id': data[0]['conversation_id'],
+        'last_message': data[0]['last_message'],
       };
       getUserData[0].addAll(additionalData);
       return getUserData;
@@ -47,6 +51,7 @@ class _ContactScreenState extends State<ContactScreen> {
   void initState() {
     super.initState();
     initialConversation();
+    print('Data ${context.read<ChatProvider>().recipientsData}');
   }
 
   @override
@@ -98,15 +103,24 @@ class _ContactScreenState extends State<ContactScreen> {
                       itemCount: conversationData.length,
                       itemBuilder: (BuildContext context, int index) {
                         final item = conversationData[index];
+                        print(item);
                         return InkWell(
                           onTap: () {
-                            Navigator.push(
+                            context.read<ChatProvider>().changeChat(
+                                newRecipientsData: item,
+                                newConversationId: item['conversation_id']);
+                            print(
+                                'Data wk ${context.read<ChatProvider>().conversationId}');
+                            print(
+                                'Data wk ${context.read<ChatProvider>().recipientsData}');
+                            if (MediaQuery.of(context).size.width < 600) {
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) => ChatScreen(
-                                        conversation_id:
-                                            item['conversation_id'],
-                                        recipients_id: item['user_id'])));
+                                  builder: (context) => const ChatScreen(),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             child: Row(
@@ -114,15 +128,25 @@ class _ContactScreenState extends State<ContactScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
-                                  child: CircleAvatar(
-                                    radius: 25,
-                                    backgroundColor: Colors.transparent,
-                                    backgroundImage: Image.network(
-                                      'https://midlsoyjkxifqakotayb.supabase.co/storage/v1/object/public/data/profile/${item['profile_picture']}',
-                                      width: 25,
-                                      height: 25,
-                                      fit: BoxFit.cover,
-                                    ).image,
+                                  child: InkWell(
+                                    onTap: () {
+                                      Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  ProfileScreen()));
+                                    },
+                                    child: ClipOval(
+                                      child: Hero(
+                                        tag: 'img',
+                                        child: Image.network(
+                                          'https://midlsoyjkxifqakotayb.supabase.co/storage/v1/object/public/data/profile/${item['profile_picture']}',
+                                          width: 50,
+                                          height: 50,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 Flexible(
@@ -140,7 +164,7 @@ class _ContactScreenState extends State<ContactScreen> {
                                               fontSize: 16,
                                             )),
                                         Text(
-                                          'Well hello there!, how was your first day at work?',
+                                          item['last_message'],
                                           style: TextStyle(
                                             fontWeight: FontWeight.w600,
                                             fontSize: 12,
